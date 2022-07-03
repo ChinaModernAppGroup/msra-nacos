@@ -30,13 +30,13 @@ fetch.Promise = Bluebird;
 
 
 // Setup a polling signal for audit.
-var fs = require('fs');
-const msranacosOnPollingSignal = '/var/tmp/msranacosOnPolling';
-
+//var fs = require('fs');
+//const msranacosOnPollingSignal = '/var/tmp/msranacosOnPolling';
+global.msranacosOnPolling = [];
 
 
 //const pollInterval = 10000; // Interval for polling Registry registry.
-var stopPolling = false;
+//var stopPolling = false;
 
 const nacosAPI = "/nacos/v1/ns/instance/list?serviceName=";
 // For functionnal verification
@@ -78,20 +78,6 @@ msranacosConfigProcessor.prototype.onStart = function (success) {
         eventChannel: this.eventChannel,
         restHelper: this.restHelper
     });
-
-    // Clear the polling signal for audit.
-    try {
-        fs.access(msranacosOnPollingSignal, fs.constants.F_OK, function (err) {
-            if (err) {
-                logger.fine("msranacos audit OnStart, the polling signal is off. ", err.message);
-            } else {
-                logger.fine("msra nacos audit onStart: ConfigProcessor started, clear the signal.");
-                fs.unlinkSync(msranacosOnPollingSignal);
-            }
-        });
-    } catch(err) {
-        logger.fine("msranacos: OnStart, hits error while check pooling signal. ", err.message);
-    }
 
     success();
 };
@@ -186,9 +172,9 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         fetch(instance, { method: action})
             .then(function (res) {
                 if (res.ok) { // res.status >= 200 && res.status < 300
-                    logger.fine("MSRA: onPost, handle the instance: "+ instanceDest, res.statusText);
+                    logger.fine("MSRA: onPost, handle the instance: " + action + instanceDest, res.statusText);
                 } else {
-                    logger.fine("MSRA: onPost, Failed to handle the instance: "+ instanceDest, res.statusText);
+                    logger.fine("MSRA: onPost, Failed to handle the instance: " + action + instanceDest, res.statusText);
                 }
             })
             .catch(err => logger.fine(err));
@@ -207,16 +193,19 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     }
 
     // Setup the polling signal for audit
-    try {
-        logger.fine("msranacos: onPost, will set the polling signal. ");
-        fs.writeFile(msranacosOnPollingSignal, '');
-    } catch (error) {
-        logger.fine("msranacos: onPost, hit error while set polling signal: ", error.message);
+    if (global.msranacosOnPolling.includes(instanceDest)) {
+        return logger.fine("msra: onPost, already has an instance polling the same serviceID, please check it out: " + serviceID);
+    } else { 
+        global.msranacosOnPolling.push(instanceDest);
+        logger.fine("msra onPost: set msranacosOnpolling signal: ", global.msranacosOnPolling);
     }
 
-    logger.fine("msra: onPost, Input properties accepted, change to BOUND status, start to poll Registry.");
+    logger.fine(
+      "msra: onPost, Input properties accepted, change to BOUND status, start to poll Registry for: " +
+        instanceDest
+    );
 
-    stopPolling = false;
+    //stopPolling = false;
 
     configTaskUtil.sendPatchToBoundState(configTaskState, 
             oThis.getUri().href, restOperation.getBasicAuthorization());
@@ -334,19 +323,19 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         }, pollInterval);
 
         // stop polling while undeployment
-        if (stopPolling) {
+        if (global.msranacosOnPolling.includes(instanceDest)) {
+            logger.fine("msra: onPost, keep polling registry for: " + instanceDest);            
+        } else {
             process.nextTick(() => {
                 clearTimeout(pollRegistry);
-                logger.fine("msra: onPost/stopping, Stop polling registry ...");
+                logger.fine("MSRA: onPost/stopping, Stop polling registry for: " + instanceDest);
             });
-            // Delete pool configuration in case it still there.
-            setTimeout(function () {
-                // deregister an instance from nacos
-                logger.fine("msra: onPost/stopping, unregister the service from nacos ...");
+            // deregister the service from nacos server
+            setTimeout (function () {
+                // deregister an service from nacos
                 handleInstance("DELETE", instanceUrl);
             }, 2000);
         }
-
     })();
 };
 
@@ -367,13 +356,17 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
     try {
         configTaskState = configTaskUtil.getAndValidateConfigTaskState(restOperation);
         blockState = configTaskState.block;
-        inputProperties = blockUtil.getMapFromPropertiesAndValidate(blockState.inputProperties,
-            ["serviceName"]);
+        inputProperties = blockUtil.getMapFromPropertiesAndValidate(
+          blockState.inputProperties,
+          ["serviceName", "ipAddr", "port"]
+        );
     } catch (ex) {
         restOperation.fail(ex);
         return;
     }
     this.completeRequest(restOperation, this.wellKnownPorts.STATUS_ACCEPTED);
+
+    const instanceDest = inputProperties.ipAddr.value + ":" + inputProperties.port.value;
 
     // Generic URI components, minus the 'path'
     var uri = this.restHelper.buildUri({
@@ -388,12 +381,13 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
                 oThis.getUri().href, restOperation.getBasicAuthorization());
     
     // Stop polling registry while undeploy ??
-    process.nextTick(() => {
-        stopPolling = true;
-        logger.fine("msra: onDelete/stopping, Stop polling registry ...");
-    });
+    let signalIndex = global.msranacosOnPolling.indexOf(instanceDest);
+    global.msranacosOnPolling.splice(signalIndex, 1);
     //stopPollingEvent.emit('stopPollingRegistry');
-    logger.fine("msra: onDelete, Stop polling Registry while ondelete action, unregister the service.");
+    logger.fine(
+      "msra: onDelete, Stop polling Registry while ondelete action, unregister the service: " +
+        instanceDest
+    );
 };
 
 module.exports = msranacosConfigProcessor;
