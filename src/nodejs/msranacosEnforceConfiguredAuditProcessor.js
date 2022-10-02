@@ -13,7 +13,12 @@
   language governing permissions and limitations under the License.
 
   Updated by Ping Xiong on May/13/2022
-
+  Updated by Ping Xiong on Oct/02/2022, modify the polling signal into a json object to keep more information.
+  let blockInstance = {
+    name: "instanceName", // a block instance of the iapplx config
+    state: "polling", // can be "polling" for normal running state; "update" to modify the iapplx config
+    instanceId: "10.1.20.40#8080#DEFAULT#DEFAULT_GROUP@@msda.nacos.com"
+  }
 */
 
 'use strict';
@@ -84,47 +89,65 @@ msranacosEnforceConfiguredAuditProcessor.prototype.onPost = function (restOperat
                     this.restHelper.jsonPrinter(auditTaskState.currentInputProperties));
                 
             */
-            var blockInputProperties = blockUtil.getMapFromPropertiesAndValidate(
-            auditTaskState.currentInputProperties,
-            ["serviceName", "ipAddr", "port"]
-            );
+            var blockInputProperties =
+              blockUtil.getMapFromPropertiesAndValidate(
+                auditTaskState.currentInputProperties,
+                [
+                  "nacosEndpoint",
+                  "nacosUserName",
+                  "nacosPassword",
+                  "namespaceId",
+                  "groupName",
+                  "clusterName",
+                  "serviceName",
+                  "ipAddr",
+                  "port",
+                ]
+              );
             
             const instanceDest = blockInputProperties.ipAddr.value + ":" + blockInputProperties.port.value;
+            const instanceId =
+              blockInputProperties.ipAddr.value +
+              blockInputProperties.port.value +
+              blockInputProperties.clusterName.value +
+              blockInputProperties.groupName.value +
+              blockInputProperties.serviceName.value +
+              blockInputProperties.namespaceId;
 
             // Check the polling state, trigger ConfigProcessor if needed.
             // Move the signal checking here
             logger.fine("msra nacos Audit: msranacosOnpolling: ", global.msranacosOnPolling);
             logger.fine("msra nacos Audit: msranacos serviceName: ", blockInputProperties.serviceName.value);
-            if (global.msranacosOnPolling.includes(instanceDest)) {
+            if (global.msranacosOnPolling.some(instance => instance.instanceId === instanceId)) {
                 logger.fine(
-                    "msra nacos audit onPost: ConfigProcessor is on polling state, no need to fire an onPost."
+                    "msra nacos audit onPost: ConfigProcessor is on polling state, no need to fire an onPost.",
+                    instanceId
                 );
             } else {
                 logger.fine(
-                    "msra nacos audit onPost: ConfigProcessor is NOT on polling state, will trigger ConfigProcessor onPost."
+                    "msra nacos audit onPost: ConfigProcessor is NOT on polling state, will trigger ConfigProcessor onPost.",
+                    instanceId
                 );
                 try {
                     var poolNameObject = getObjectByID(
-                    "serviceName",
-                    auditTaskState.currentInputProperties
+                        "serviceName",
+                        auditTaskState.currentInputProperties
                     );
                     poolNameObject.value = null;
                     oThis.finishOperation(restOperation, auditTaskState);
                     logger.fine(
-                    "msra nacos audit onPost: trigger ConfigProcessor onPost "
+                        "msra nacos audit onPost: trigger ConfigProcessor onPost ",
+                        instanceId
                     );
                 } catch (err) {
                     logger.fine(
-                    "msra nacos audit onPost: Failed to send out restOperation. ",
-                    err.message
+                        "msra nacos audit onPost: Failed to send out restOperation. ",
+                        err.message
                     );
                 }
             }
         } catch (ex) {
-            logger.fine(
-            "msranacosEnforceConfiguredAuditProcessor.prototype.onPost caught generic exception " +
-                ex
-            );
+            logger.fine("msranacosEnforceConfiguredAuditProcessor.prototype.onPost caught generic exception ", ex);
             restOperation.fail(ex);
         }
     }, 1000);

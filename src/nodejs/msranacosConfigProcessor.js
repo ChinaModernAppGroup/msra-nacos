@@ -13,6 +13,12 @@
   language governing permissions and limitations under the License.
   
   Updated by Ping Xiong on May/04/2022.
+  Updated by Ping Xiong on Oct/02/2022, modify the polling signal into a json object to keep more information.
+  let blockInstance = {
+    name: "instanceName", // a block instance of the iapplx config
+    state: "polling", // can be "polling" for normal running state; "update" to modify the iapplx config
+    instanceId: "10.1.20.40#8080#DEFAULT#DEFAULT_GROUP@@msda.nacos.com"
+  }
 */
 
 'use strict';
@@ -96,16 +102,19 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         oThis = this;
     logger.fine("msra: onPost, msranacosConfigProcessor.prototype.onPost");
 
+    var instanceName;
     var inputProperties;
     var dataProperties;
     try {
-        configTaskState = configTaskUtil.getAndValidateConfigTaskState(restOperation);
+        configTaskState =
+        configTaskUtil.getAndValidateConfigTaskState(restOperation);
         blockState = configTaskState.block;
         logger.fine("msra: onPost, inputProperties ", blockState.inputProperties);
         logger.fine("msra: onPost, dataProperties ", blockState.dataProperties);
+        logger.fine("MSDA: onPost, instanceName ", blockState.name);
         inputProperties = blockUtil.getMapFromPropertiesAndValidate(
-          blockState.inputProperties,
-          [
+        blockState.inputProperties,
+        [
             "nacosEndpoint",
             "nacosUserName",
             "nacosPassword",
@@ -114,14 +123,14 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
             "clusterName",
             "serviceName",
             "ipAddr",
-            "port"
-          ]
+            "port",
+        ]
         );
         dataProperties = blockUtil.getMapFromPropertiesAndValidate(
-            blockState.dataProperties,
-            ["pollInterval"]
+        blockState.dataProperties,
+        ["pollInterval"]
         );
-
+        instanceName = blockState.name;
     } catch (ex) {
         restOperation.fail(ex);
         return;
@@ -134,7 +143,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     var uri = this.restHelper.buildUri({
         protocol: this.wellKnownPorts.DEFAULT_HTTP_SCHEME,
         port: this.wellKnownPorts.DEFAULT_JAVA_SERVER_PORT,
-        hostname : "localhost"
+        hostname: "localhost",
     });
 
     //Accept input proterties, set the status to BOUND.
@@ -149,71 +158,161 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     const inputIpAddr = inputProperties.ipAddr.value;
     const inputPort = inputProperties.port.value;
     var pollInterval = dataProperties.pollInterval.value * 1000;
-    //var accessToken = "";
 
-    const instanceDest = inputIpAddr + ':' + inputPort;
-    const nacosAuthUrl = inputEndPoint + '/nacos/v1/auth/login';
-    const nacosCrendential = 'username=' + inputUserName + '&password=' + inputPassword;
-    var instanceUrl = inputEndPoint +   "/nacos/v1/ns/instance?" +
-        "namespaceId=" + inputNamespaceId +
-        "&groupName=" + inputGroupName +
-        "&inputClusterName=" + inputClusterName +
-        "&serviceName=" + inputServiceName +
-        "&ip=" + inputIpAddr +
-        "&port=" + inputPort +
+    // define a uuid for the instance
+    const instanceId =
+        inputIpAddr +
+        inputPort +
+        inputClusterName +
+        inputGroupName +
+        inputServiceName +
+        inputNamespaceId;
+    const instanceDest = inputIpAddr + ":" + inputPort;
+    const nacosAuthUrl = inputEndPoint + "/nacos/v1/auth/login";
+    const nacosCrendential =
+        "username=" + inputUserName + "&password=" + inputPassword;
+    var instanceUrl =
+        inputEndPoint +
+        "/nacos/v1/ns/instance?" +
+        "namespaceId=" +
+        inputNamespaceId +
+        "&groupName=" +
+        inputGroupName +
+        "&inputClusterName=" +
+        inputClusterName +
+        "&serviceName=" +
+        inputServiceName +
+        "&ip=" +
+        inputIpAddr +
+        "&port=" +
+        inputPort +
         "&ephemeral=false";
-    var listInstanceUrl = inputEndPoint + '/nacos/v1/ns/instance/list?' +
-        'serviceName=' + inputServiceName;
-
+    var listInstanceUrl =
+        inputEndPoint +
+        "/nacos/v1/ns/instance/list?" +
+        "serviceName=" +
+        inputServiceName;
 
     //Handle an instance, for action parameter, 'POST' for register and 'DELETE' for unregister
-    function handleInstance (action, instance) {
+    function handleInstance(action, instance) {
         // deregister an instance from nacos
-        fetch(instance, { method: action})
-            .then(function (res) {
-                if (res.ok) { // res.status >= 200 && res.status < 300
-                    logger.fine("MSRA: onPost, handle the instance: " + action + instanceDest, res.statusText);
-                } else {
-                    logger.fine("MSRA: onPost, Failed to handle the instance: " + action + instanceDest, res.statusText);
-                }
-            })
-            .catch(err => logger.fine(err));
+        fetch(instance, { method: action })
+        .then(function (res) {
+            if (res.ok) {
+            // res.status >= 200 && res.status < 300
+            logger.fine(
+                "MSRA: onPost, " + instanceName + " handle the instance: " + action + instanceId,
+                res.statusText
+            );
+            } else {
+            logger.fine(
+                "MSRA: onPost, " + instanceName + " Failed to handle the instance: " +
+                action +
+                instanceId,
+                res.statusText
+            );
+            }
+        })
+        .catch((err) => logger.fine(err));
     }
-
 
     // Set the polling interval
     if (pollInterval) {
         if (pollInterval < 10000) {
-            logger.fine("msra: onPost, pollInternal is too short, will set it to 10s ", pollInterval);
-            pollInterval = 10000;
+        logger.fine(
+            "msra: onPost, " +
+            instanceName +
+            " pollInternal is too short, will set it to 10s ",
+            pollInterval
+        );
+        pollInterval = 10000;
         }
     } else {
-        logger.fine("msra: onPost, pollInternal is not set, will set it to 30s ", pollInterval);
+        logger.fine(
+            "msra: onPost, " +
+            instanceName +
+            " pollInternal is not set, will set it to 30s ",
+            pollInterval
+        );
         pollInterval = 30000;
     }
 
-    // Setup the polling signal for audit
-    if (global.msranacosOnPolling.includes(instanceDest)) {
-        return logger.fine("msra: onPost, already has an instance polling the same serviceID, please check it out: " + serviceID);
-    } else { 
-        global.msranacosOnPolling.push(instanceDest);
-        logger.fine("msra onPost: set msranacosOnpolling signal: ", global.msranacosOnPolling);
+    // Setup the polling signal for audit and update
+    // update on Oct/02/2022, using json object for polling signal, by Ping Xiong.
+        
+    let blockInstance = {
+        name: instanceName,
+        instanceId: instanceId,
+        state: "polling"
+    };
+
+    let signalIndex = global.msdanacosOnPolling.findIndex(
+        (instance) => instance.name === instanceName
+    );
+
+    if (signalIndex !== -1) {
+      // Already has the instance, change the state into "update"
+      global.msdanacosOnPolling.splice(signalIndex, 1);
+      blockInstance.state = "update";
+    }
+    logger.fine(
+        "MSRA: onPost, " + instanceName + " blockInstance:",
+        blockInstance
+    );
+
+    // Setup a signal to identify existing polling loop
+    var existingPollingLoop = false;
+
+    // check if there is an conflict instanceId running in configuration
+    if (global.msranacosOnPolling.some(instance => instance.instanceId === instanceId)) {
+        logger.fine(
+            "msra: onPost, " +
+            instanceName +
+            " already has an instance polling the same instancdId, change BLOCK to ERROR: ",
+            instanceId
+        );
+        try {
+            throw new Error(
+                "onPost: instanceId conflict: " +
+                instanceId +
+                " , will set the BLOCK to ERROR state"
+            );
+        } catch (error) {
+            configTaskUtil.sendPatchToErrorState(
+                configTaskState,
+                error,
+                oThis.getUri().href,
+                restOperation.getBasicAuthorization()
+            );
+        }
+        return;
+    } else {
+        global.msranacosOnPolling.push(blockInstance);
+        logger.fine(
+            "msra onPost: " + instanceName + " set msranacosOnpolling signal: ",
+            global.msranacosOnPolling
+        );
     }
 
     logger.fine(
-      "msra: onPost, Input properties accepted, change to BOUND status, start to poll Registry for: " +
-        instanceDest
+        "msra: onPost, " +
+        instanceName +
+        " Input properties accepted, change to BOUND status, start to poll Registry for: " +
+        instanceId
     );
 
-    //stopPolling = false;
-
-    configTaskUtil.sendPatchToBoundState(configTaskState, 
-            oThis.getUri().href, restOperation.getBasicAuthorization());
+    configTaskUtil.sendPatchToBoundState(
+        configTaskState,
+        oThis.getUri().href,
+        restOperation.getBasicAuthorization()
+    );
 
     // A internal service to retrieve service member information from registry, and then update BIG-IP setting.
 
-    //inputEndPoint = inputEndPoint.toString().split(","); 
-    logger.fine("msra: onPost, registry endpoints: " + inputEndPoint);
+    //inputEndPoint = inputEndPoint.toString().split(",");
+    logger.fine(
+        "msra: onPost, " + instanceName + " registry endpoints: ", inputEndPoint
+    );
 
     // connect to nacos registry to retrieve end points.
 
@@ -223,115 +322,250 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
 
     (function schedule() {
         var pollRegistry = setTimeout(function () {
+
+            // If signal state is "update", change it into "polling" for new polling loop
+            if (
+                global.msranacosOnPolling.some(
+                    (instance) => instance.name === instanceName
+                )
+            ) {
+                let signalIndex = global.msranacosOnPolling.findIndex(
+                    (instance) => instance.name === instanceName
+                );
+                if (global.msranacosOnPolling[signalIndex].state === "update") {
+                    if (existingPollingLoop) {
+                        logger.fine(
+                            "MSRA: onPost/polling, " +
+                            instanceName +
+                            " update config, existing polling loop."
+                    );
+                    } else {
+                        //logger.fine("MSDA: onPost/polling, " + instanceName + " update config, a new polling loop.");
+                        global.msranacosOnPolling[signalIndex].state = "polling";
+                        logger.fine(
+                            "MSDA: onPost/polling, " +
+                            instanceName +
+                            " update the signal.state into polling for new polling loop: ",
+                            global.msranacosOnPolling[signalIndex]
+                        );
+                    }
+                }
+                // update the existingPollingLoop to true
+                existingPollingLoop = true;
+            } else {
+                // Non-exist instance, will NOT proceed to poll the registry
+                return logger.fine(
+                    "MSRA: onPost/polling, " +
+                    instanceName +
+                    " Stop polling registry for: " +
+                    instanceName
+                );
+            }
+
+            // polling the registry ...
             fetch(listInstanceUrl)
                 .then(function (res) {
-                    if (res.ok) { // res.status >= 200 && res.status < 300,  // json response
-                        logger.fine('msra: onPost, access service hits return code: ', res.statusText);
+                    if (res.ok) {
+                        // res.status >= 200 && res.status < 300,  // json response
+                        logger.fine(
+                            "msra: onPost, " +
+                            instanceName +
+                            " access service hits return code: ",
+                            res.statusText
+                        );
                         return res.json();
                     } else {
-                        logger.fine('msra: onPost, access service hits return code: ', res.statusText);
+                        logger.fine(
+                            "msra: onPost, " +
+                            instanceName +
+                            " access service hits return code: ",
+                            res.statusText
+                        );
                         // what if 403 ? what else ?
-                        if (res.statusText == 'Forbidden') {
-                            logger.fine('msra: onPost, Hit 403, will retry: ');
-                            fetch(nacosAuthUrl, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                    body: nacosCrendential
-                                })
-                                .then(function (res) {
-                                    if (res.ok) { // res.status >= 200 && res.status < 300,  // json response
-                                        return res.json();
-                                    } else {
-                                        logger.fine('msra: onPost, Sent auth with return code: ', res.statusText);
-                                        // what if 403 ? what else ?
-                                        return;
-                                    }
-                                })
-                                .then(function (jsondata) {
-                                    logger.fine('msra: onPost, accesToken: ', jsondata.accessToken);
-                                    // Authenticated user, go ahead for further process.
-                                    instanceUrl = instanceUrl + "&accessToken=" + jsondata.accessToken;
-                                    listInstanceUrl = listInstanceUrl + "&accessToken=" + jsondata.accessToken;
-                                })
-                                .catch(function (error) {
-                                    logger.fine("msra: onPost, Can't get accessToken: ", error.message);
-                                });
+                        if (res.statusText == "Forbidden") {
+                        logger.fine("msra: onPost, " + instanceName + " Hit 403, will retry: ");
+                        fetch(nacosAuthUrl, {
+                            method: "POST",
+                            headers: {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            },
+                            body: nacosCrendential,
+                        })
+                            .then(function (res) {
+                            if (res.ok) {
+                                // res.status >= 200 && res.status < 300,  // json response
+                                return res.json();
+                            } else {
+                                logger.fine(
+                                "msra: onPost, " + instanceName + " Sent auth with return code: ",
+                                res.statusText
+                                );
+                                // what if 403 ? what else ?
+                                return;
+                            }
+                            })
+                            .then(function (jsondata) {
+                            logger.fine(
+                              "msra: onPost, " + instanceName + " accesToken: ",
+                              jsondata.accessToken
+                            );
+                            // Authenticated user, go ahead for further process.
+                            instanceUrl =
+                                instanceUrl + "&accessToken=" + jsondata.accessToken;
+                            listInstanceUrl =
+                                listInstanceUrl + "&accessToken=" + jsondata.accessToken;
+                            })
+                            .catch(function (error) {
+                            logger.fine(
+                                "msra: onPost, " + instanceName + " Can't get accessToken: ",
+                                error.message
+                            );
+                            });
                         }
                     }
-                })
-                .then(function(jsondata) {
+                }).then(function (jsondata) {
                     let nodeAddress = [];
-                    jsondata.hosts.forEach(element => {
-                        nodeAddress.push(element.ip+ ":"+element.port);
+                    jsondata.hosts.forEach((element) => {
+                        nodeAddress.push(element.ip + ":" + element.port);
                     });
-                    logger.fine("msra: onPost, service endpoint list: ", nodeAddress);
+                    logger.fine("msra: onPost, " + instanceName + " service endpoint list: ", nodeAddress);
                     if (nodeAddress.includes(instanceDest)) {
-                        logger.fine("The VS in the list, will check the status of the VS in F5: ", instanceDest);
-                        // will check the status of the virtual in F5, decide the action based on the healthcheck result.
-                        // do tmsh to get the status of vs, if vs is available, do nothing, otherwise unregister the instance
-                        mytmsh.executeCommand("tmsh -a show ltm virtual " + inputServiceName +' field-fmt').then(function (res) {
-                            logger.fine("MSRA: onPost, Found the virtual server in F5, will check the availability: " + inputServiceName);
-                            if (res.indexOf('status.availability-state available') >= 0) {
-                                logger.fine("MSRA: onPost, the virtual server in F5 is available, will do nothing: " + inputServiceName);
-                            } else {
-                                logger.fine("MSRA: onPost, he virtual server is not available, will unregister from nacos server: " + inputServiceName);
-                                // unregister an instance from nacos
-                                handleInstance("DELETE", instanceUrl);
-                            }
+                    logger.fine(
+                        "MSRA: onPost, " + instanceName + " The VS in the list, will check the status of the VS in F5: ",
+                        instanceDest
+                    );
+                    // will check the status of the virtual in F5, decide the action based on the healthcheck result.
+                    // do tmsh to get the status of vs, if vs is available, do nothing, otherwise unregister the instance
+                    mytmsh
+                        .executeCommand(
+                        "tmsh -a show ltm virtual " + inputServiceName + " field-fmt"
+                        )
+                        .then(function (res) {
+                        logger.fine(
+                            "MSRA: onPost, " + instanceName + " Found the virtual server in F5, will check the availability: ",
+                            inputServiceName
+                        );
+                        if (res.indexOf("status.availability-state available") >= 0) {
+                            logger.fine(
+                                "MSRA: onPost, " + instanceName + " the virtual server in F5 is available, will do nothing: ",
+                                inputServiceName
+                            );
+                        } else {
+                            logger.fine(
+                                "MSRA: onPost, " + instanceName + " the virtual server is not available, will unregister from nacos server: ",
+                                inputServiceName
+                            );
+                            // unregister an instance from nacos
+                            handleInstance("DELETE", instanceUrl);
+                        }
                         })
                         // Error handling
                         .catch(function (error) {
-                            if (error.message.indexOf('was not found') >= 0) {
-                                logger.fine("MSRA: onPost, virtual server not found, will unregister from nacos server: " + inputServiceName);
+                        if (error.message.indexOf("was not found") >= 0) {
+                            logger.fine(
+                                "MSRA: onPost, " + instanceName + " virtual server not found, will unregister from nacos server: ",
+                                inputServiceName
+                            );
 
-                                // deregister an instance from nacos
-                                handleInstance("DELETE", instanceUrl);
-                                return;
-                            }
-                            logger.fine("MSRA: onPost, Fail to check status of the virtual server: " + error.message);
+                            // deregister an instance from nacos
+                            handleInstance("DELETE", instanceUrl);
                             return;
+                        }
+                        logger.fine(
+                            "MSRA: onPost, " + instanceName + " Fail to check status of the virtual server: ",
+                            error.message
+                        );
+                        return;
                         });
                     } else {
-                        logger.fine("The VS is not in the list, will check the status of VS.", instanceDest);
-                        // do tmsh to get the status of vs, if vs is available, register the instance, otherwise do nothing.
-                        mytmsh.executeCommand("tmsh -a show ltm virtual " + inputServiceName +' field-fmt').then(function (res) {
-                            logger.fine("MSRA: onPost, Found the virtual server in F5, will check the availability: " + inputServiceName);
-                            if (res.indexOf('status.availability-state available') >= 0) {
-                                logger.fine("MSRA: onPost, the virtual server in F5 is available, will register it to nacos server: " + inputServiceName);
-                                // register an instance to nacos
-                                handleInstance('POST', instanceUrl);
-                            } else {
-                                logger.fine("MSRA: onPost, the virtual server in F5 is NOT available, will not to register it into nacos: " + inputServiceName);
-                            }
+                    logger.fine(
+                        "MSRA: onPost, " + instanceName + " The VS is not in the list, will check the status of VS.",
+                        instanceDest
+                    );
+                    // do tmsh to get the status of vs, if vs is available, register the instance, otherwise do nothing.
+                    mytmsh
+                        .executeCommand(
+                        "tmsh -a show ltm virtual " + inputServiceName + " field-fmt"
+                        )
+                        .then(function (res) {
+                        logger.fine(
+                            "MSRA: onPost, " + instanceName + " Found the virtual server in F5, will check the availability: ",
+                            inputServiceName
+                        );
+                        if (res.indexOf("status.availability-state available") >= 0) {
+                            logger.fine(
+                                "MSRA: onPost, " + instanceName + " the virtual server in F5 is available, will register it to nacos server: ",
+                                inputServiceName
+                            );
+                            // register an instance to nacos
+                            handleInstance("POST", instanceUrl);
+                        } else {
+                            logger.fine(
+                                "MSRA: onPost, " + instanceName + " the virtual server in F5 is NOT available, will not to register it into nacos: ",
+                                inputServiceName
+                            );
+                        }
                         })
                         // Error handling
                         .catch(function (error) {
-                            if (error.message.indexOf('was not found') >= 0) {
-                                logger.fine("MSRA: onPost, virtual server not found: " + inputServiceName);
-                                return;
-                            }
-                            logger.fine("MSRA: onPost, Fail to check status of the virtual server: " + error.message);
+                        if (error.message.indexOf("was not found") >= 0) {
+                            logger.fine(
+                                "MSRA: onPost, " + instanceName + " virtual server not found: ",
+                                inputServiceName
+                            );
                             return;
+                        }
+                        logger.fine(
+                            "MSRA: onPost, " + instanceName + " Fail to check status of the virtual server: ",
+                            error.message
+                        );
+                        return;
                         });
                     }
                 }, function (err) {
-                    logger.fine("msra: onPost, Fail to retrieve service endpoint list due to: ", err.message);
-                }).catch(function (error) {
-                    logger.fine("msra: onPost, Fail to retrieve service endpoint list due to: ", error.message);
+                    logger.fine(
+                        "msra: onPost, " + instanceName + " Fail to retrieve service endpoint list due to: ",
+                        err.message
+                    );
+                }
+                ).catch(function (error) {
+                    logger.fine(
+                        "msra: onPost, " + instanceName + " Fail to retrieve service endpoint list due to: ",
+                        error.message
+                    );
+                }).done(function () {
+                    logger.fine("MSRA: onPost/polling, " + instanceName + " finish a polling action.");
+                    schedule();
                 });
-            schedule();
         }, pollInterval);
 
-        // stop polling while undeployment
-        if (global.msranacosOnPolling.includes(instanceDest)) {
-            logger.fine("msra: onPost, keep polling registry for: " + instanceDest);            
-        } else {
+        // stop polling while undeployment or update the config
+        let stopPolling = true;
+
+        if (global.msranacosOnPolling.some(instance => instance.name === instanceName)) {
+            let signalIndex = global.msranacosOnPolling.findIndex(instance => instance.name === instanceName);
+            if (global.msranacosOnPolling[signalIndex].state === "polling") {
+                logger.fine("MSRA: onPost, " + instanceName + " keep polling registry for: ", instanceId);
+                stopPolling = false;
+            } else {
+                if (existingPollingLoop) {
+                    logger.fine("MSRA: onPost, " + instanceName + " update config, will terminate existing polling loop.");
+                } else {
+                    logger.fine("MSRA: onPost, " + instanceName + " update config, will trigger a new polling loop.");
+                    stopPolling = false;
+                }
+            }
+        }
+
+        if (stopPolling) {
             process.nextTick(() => {
                 clearTimeout(pollRegistry);
-                logger.fine("MSRA: onPost/stopping, Stop polling registry for: " + instanceDest);
+                logger.fine(
+                "MSRA: onPost/stopping, " + instanceName + " Stop polling registry for: ", instanceId
+                );
             });
             // deregister the service from nacos server
-            setTimeout (function () {
+            setTimeout(function () {
                 // deregister an service from nacos
                 handleInstance("DELETE", instanceUrl);
             }, 2000);
@@ -352,6 +586,7 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
 
     logger.fine("msra: onDelete, msranacosConfigProcessor.prototype.onDelete");
 
+    var instanceName;
     var inputProperties;
     try {
         configTaskState = configTaskUtil.getAndValidateConfigTaskState(restOperation);
@@ -360,13 +595,14 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
           blockState.inputProperties,
           ["serviceName", "ipAddr", "port"]
         );
+        instanceName = blockState.name;
     } catch (ex) {
         restOperation.fail(ex);
         return;
     }
     this.completeRequest(restOperation, this.wellKnownPorts.STATUS_ACCEPTED);
 
-    const instanceDest = inputProperties.ipAddr.value + ":" + inputProperties.port.value;
+    //const instanceId = inputProperties.ipAddr.value + ":" + inputProperties.port.value;
 
     // Generic URI components, minus the 'path'
     var uri = this.restHelper.buildUri({
@@ -381,12 +617,11 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
                 oThis.getUri().href, restOperation.getBasicAuthorization());
     
     // Stop polling registry while undeploy ??
-    let signalIndex = global.msranacosOnPolling.indexOf(instanceDest);
+    let signalIndex = global.msranacosOnPolling.findIndex(instance => instance.name === instanceName);
     global.msranacosOnPolling.splice(signalIndex, 1);
     //stopPollingEvent.emit('stopPollingRegistry');
     logger.fine(
-      "msra: onDelete, Stop polling Registry while ondelete action, unregister the service: " +
-        instanceDest
+      "msra: onDelete, " + instanceName + " Stop polling Registry while ondelete action, will unregister the service."
     );
 };
 
