@@ -354,11 +354,13 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                 existingPollingLoop = true;
             } else {
                 // Non-exist instance, will NOT proceed to poll the registry
+                // deregister an service from nacos
+                handleInstance("DELETE", instanceUrl);
                 return logger.fine(
-                    "MSRA: onPost/polling, " +
+                  "MSRA: onPost/polling, " +
                     instanceName +
                     " Stop polling registry for: " +
-                    instanceName
+                    instanceId
                 );
             }
 

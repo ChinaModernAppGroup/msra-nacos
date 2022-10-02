@@ -112,12 +112,13 @@ msranacosEnforceConfiguredAuditProcessor.prototype.onPost = function (restOperat
               blockInputProperties.clusterName.value +
               blockInputProperties.groupName.value +
               blockInputProperties.serviceName.value +
-              blockInputProperties.namespaceId;
+              blockInputProperties.namespaceId.value;
 
             // Check the polling state, trigger ConfigProcessor if needed.
             // Move the signal checking here
             logger.fine("msra nacos Audit: msranacosOnpolling: ", global.msranacosOnPolling);
             logger.fine("msra nacos Audit: msranacos serviceName: ", blockInputProperties.serviceName.value);
+            logger.fine("msra nacos Audit: msranacos instancdId: ", instanceId);
             if (global.msranacosOnPolling.some(instance => instance.instanceId === instanceId)) {
                 logger.fine(
                     "msra nacos audit onPost: ConfigProcessor is on polling state, no need to fire an onPost.",

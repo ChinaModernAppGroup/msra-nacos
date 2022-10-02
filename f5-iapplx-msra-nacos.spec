@@ -1,7 +1,7 @@
-Summary: F5 Basic iApp
+Summary: F5 MSRA for nacos
 Name: f5-iapplx-msra-nacos
-Version: 0.0.1
-Release: 0005
+Version: 0.0.2
+Release: 0002
 BuildArch: noarch
 Group: Development/Libraries
 License: Commercial
