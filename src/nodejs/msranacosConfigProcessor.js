@@ -341,7 +341,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                     );
                     } else {
                         //logger.fine("MSRA: onPost/polling, " + instanceName + " update config, a new polling loop.");
-                        global.msranacosOnPolling[signalIndex].state = "polling";
+                        global.msranacosOnPolling[signalIndex].state === "polling";
                         logger.fine(
                             "MSRA: onPost/polling, " +
                             instanceName +
