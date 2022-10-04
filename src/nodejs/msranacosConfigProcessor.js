@@ -75,7 +75,7 @@ msranacosConfigProcessor.prototype.setModuleDependencies = function (options) {
 msranacosConfigProcessor.prototype.WORKER_URI_PATH = "shared/iapp/processors/msranacosConfig";
 
 msranacosConfigProcessor.prototype.onStart = function (success) {
-    logger.fine("msra: OnStart, msranacosConfigProcessor.prototype.onStart");
+    logger.fine("MSRA: OnStart, msranacosConfigProcessor.prototype.onStart");
     this.apiStatus = this.API_STATUS.INTERNAL_ONLY;
     this.isPublic = true;
 
@@ -100,7 +100,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     var configTaskState,
         blockState,
         oThis = this;
-    logger.fine("msra: onPost, msranacosConfigProcessor.prototype.onPost");
+    logger.fine("MSRA: onPost, msranacosConfigProcessor.prototype.onPost");
 
     var instanceName;
     var inputProperties;
@@ -109,9 +109,9 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         configTaskState =
         configTaskUtil.getAndValidateConfigTaskState(restOperation);
         blockState = configTaskState.block;
-        logger.fine("msra: onPost, inputProperties ", blockState.inputProperties);
-        logger.fine("msra: onPost, dataProperties ", blockState.dataProperties);
-        logger.fine("MSDA: onPost, instanceName ", blockState.name);
+        logger.fine("MSRA: onPost, inputProperties ", blockState.inputProperties);
+        logger.fine("MSRA: onPost, dataProperties ", blockState.dataProperties);
+        logger.fine("MSRA: onPost, instanceName ", blockState.name);
         inputProperties = blockUtil.getMapFromPropertiesAndValidate(
         blockState.inputProperties,
         [
@@ -220,7 +220,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     if (pollInterval) {
         if (pollInterval < 10000) {
         logger.fine(
-            "msra: onPost, " +
+            "MSRA: onPost, " +
             instanceName +
             " pollInternal is too short, will set it to 10s ",
             pollInterval
@@ -229,7 +229,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         }
     } else {
         logger.fine(
-            "msra: onPost, " +
+            "MSRA: onPost, " +
             instanceName +
             " pollInternal is not set, will set it to 30s ",
             pollInterval
@@ -246,13 +246,13 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         state: "polling"
     };
 
-    let signalIndex = global.msdanacosOnPolling.findIndex(
+    let signalIndex = global.msranacosOnPolling.findIndex(
         (instance) => instance.name === instanceName
     );
 
     if (signalIndex !== -1) {
       // Already has the instance, change the state into "update"
-      global.msdanacosOnPolling.splice(signalIndex, 1);
+      global.msranacosOnPolling.splice(signalIndex, 1);
       blockInstance.state = "update";
     }
     logger.fine(
@@ -266,7 +266,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     // check if there is an conflict instanceId running in configuration
     if (global.msranacosOnPolling.some(instance => instance.instanceId === instanceId)) {
         logger.fine(
-            "msra: onPost, " +
+            "MSRA: onPost, " +
             instanceName +
             " already has an instance polling the same instancdId, change BLOCK to ERROR: ",
             instanceId
@@ -289,13 +289,13 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     } else {
         global.msranacosOnPolling.push(blockInstance);
         logger.fine(
-            "msra onPost: " + instanceName + " set msranacosOnpolling signal: ",
+            "MSRA: onPost, " + instanceName + " set msranacosOnpolling signal: ",
             global.msranacosOnPolling
         );
     }
 
     logger.fine(
-        "msra: onPost, " +
+        "MSRA: onPost, " +
         instanceName +
         " Input properties accepted, change to BOUND status, start to poll Registry for: " +
         instanceId
@@ -311,7 +311,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
 
     //inputEndPoint = inputEndPoint.toString().split(",");
     logger.fine(
-        "msra: onPost, " + instanceName + " registry endpoints: ", inputEndPoint
+        "MSRA: onPost, " + instanceName + " registry endpoints: ", inputEndPoint
     );
 
     // connect to nacos registry to retrieve end points.
@@ -340,10 +340,10 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                             " update config, existing polling loop."
                     );
                     } else {
-                        //logger.fine("MSDA: onPost/polling, " + instanceName + " update config, a new polling loop.");
+                        //logger.fine("MSRA: onPost/polling, " + instanceName + " update config, a new polling loop.");
                         global.msranacosOnPolling[signalIndex].state = "polling";
                         logger.fine(
-                            "MSDA: onPost/polling, " +
+                            "MSRA: onPost/polling, " +
                             instanceName +
                             " update the signal.state into polling for new polling loop: ",
                             global.msranacosOnPolling[signalIndex]
@@ -370,7 +370,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                     if (res.ok) {
                         // res.status >= 200 && res.status < 300,  // json response
                         logger.fine(
-                            "msra: onPost, " +
+                            "MSRA: onPost, " +
                             instanceName +
                             " access service hits return code: ",
                             res.statusText
@@ -378,14 +378,14 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                         return res.json();
                     } else {
                         logger.fine(
-                            "msra: onPost, " +
+                            "MSRA: onPost, " +
                             instanceName +
                             " access service hits return code: ",
                             res.statusText
                         );
                         // what if 403 ? what else ?
                         if (res.statusText == "Forbidden") {
-                        logger.fine("msra: onPost, " + instanceName + " Hit 403, will retry: ");
+                        logger.fine("MSRA: onPost, " + instanceName + " Hit 403, will retry: ");
                         fetch(nacosAuthUrl, {
                             method: "POST",
                             headers: {
@@ -399,7 +399,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                                 return res.json();
                             } else {
                                 logger.fine(
-                                "msra: onPost, " + instanceName + " Sent auth with return code: ",
+                                "MSRA: onPost, " + instanceName + " Sent auth with return code: ",
                                 res.statusText
                                 );
                                 // what if 403 ? what else ?
@@ -408,7 +408,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                             })
                             .then(function (jsondata) {
                             logger.fine(
-                              "msra: onPost, " + instanceName + " accesToken: ",
+                              "MSRA: onPost, " + instanceName + " accesToken: ",
                               jsondata.accessToken
                             );
                             // Authenticated user, go ahead for further process.
@@ -419,7 +419,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                             })
                             .catch(function (error) {
                             logger.fine(
-                                "msra: onPost, " + instanceName + " Can't get accessToken: ",
+                                "MSRA: onPost, " + instanceName + " Can't get accessToken: ",
                                 error.message
                             );
                             });
@@ -430,7 +430,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                     jsondata.hosts.forEach((element) => {
                         nodeAddress.push(element.ip + ":" + element.port);
                     });
-                    logger.fine("msra: onPost, " + instanceName + " service endpoint list: ", nodeAddress);
+                    logger.fine("MSRA: onPost, " + instanceName + " service endpoint list: ", nodeAddress);
                     if (nodeAddress.includes(instanceDest)) {
                     logger.fine(
                         "MSRA: onPost, " + instanceName + " The VS in the list, will check the status of the VS in F5: ",
@@ -526,13 +526,13 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                     }
                 }, function (err) {
                     logger.fine(
-                        "msra: onPost, " + instanceName + " Fail to retrieve service endpoint list due to: ",
+                        "MSRA: onPost, " + instanceName + " Fail to retrieve service endpoint list due to: ",
                         err.message
                     );
                 }
                 ).catch(function (error) {
                     logger.fine(
-                        "msra: onPost, " + instanceName + " Fail to retrieve service endpoint list due to: ",
+                        "MSRA: onPost, " + instanceName + " Fail to retrieve service endpoint list due to: ",
                         error.message
                     );
                 }).done(function () {
@@ -586,7 +586,7 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
         blockState;
     var oThis = this;
 
-    logger.fine("msra: onDelete, msranacosConfigProcessor.prototype.onDelete");
+    logger.fine("MSRA: onDelete, msranacosConfigProcessor.prototype.onDelete");
 
     var instanceName;
     var inputProperties;
@@ -623,7 +623,7 @@ msranacosConfigProcessor.prototype.onDelete = function (restOperation) {
     global.msranacosOnPolling.splice(signalIndex, 1);
     //stopPollingEvent.emit('stopPollingRegistry');
     logger.fine(
-      "msra: onDelete, " + instanceName + " Stop polling Registry while ondelete action, will unregister the service."
+      "MSRA: onDelete, " + instanceName + " Stop polling Registry while ondelete action, will unregister the service."
     );
 };
 
