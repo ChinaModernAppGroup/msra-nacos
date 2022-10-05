@@ -123,7 +123,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
             "clusterName",
             "serviceName",
             "ipAddr",
-            "port",
+            "port"
         ]
         );
         dataProperties = blockUtil.getMapFromPropertiesAndValidate(
@@ -143,7 +143,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     var uri = this.restHelper.buildUri({
         protocol: this.wellKnownPorts.DEFAULT_HTTP_SCHEME,
         port: this.wellKnownPorts.DEFAULT_JAVA_SERVER_PORT,
-        hostname: "localhost",
+        hostname: "localhost"
     });
 
     //Accept input proterties, set the status to BOUND.
@@ -268,7 +268,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         logger.fine(
             "MSRA: onPost, " +
             instanceName +
-            " already has an instance polling the same instancdId, change BLOCK to ERROR: ",
+            " already has an instance polling the same instanceId, change BLOCK to ERROR: ",
             instanceId
         );
         try {
@@ -341,7 +341,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                     );
                     } else {
                         //logger.fine("MSRA: onPost/polling, " + instanceName + " update config, a new polling loop.");
-                        global.msranacosOnPolling[signalIndex].state === "polling";
+                        global.msranacosOnPolling[signalIndex].state = "polling";
                         logger.fine(
                             "MSRA: onPost/polling, " +
                             instanceName +
