@@ -79,7 +79,7 @@ msranacosEnforceConfiguredAuditProcessor.prototype.onPost = function (restOperat
     var oThis = this;
     var auditTaskState = restOperation.getBody();
 
-    setTimeout(function () {
+    //setTimeout(function () {
         try {
             if (!auditTaskState) {
             throw new Error("AUDIT: Audit task state must exist ");
@@ -116,18 +116,30 @@ msranacosEnforceConfiguredAuditProcessor.prototype.onPost = function (restOperat
 
             // Check the polling state, trigger ConfigProcessor if needed.
             // Move the signal checking here
-            logger.fine("msra nacos Audit: msranacosOnpolling: ", global.msranacosOnPolling);
-            logger.fine("msra nacos Audit: msranacos serviceName: ", blockInputProperties.serviceName.value);
-            logger.fine("msra nacos Audit: msranacos instancdId: ", instanceId);
+            logger.fine(
+              getLogHeader() + "msra nacos Audit: msranacosOnpolling: ",
+              global.msranacosOnPolling
+            );
+            logger.fine(
+              getLogHeader() + "msra nacos Audit: msranacos serviceName: ",
+              blockInputProperties.serviceName.value
+            );
+            logger.fine(
+              getLogHeader() + "msra nacos Audit: msranacos instancdId: ",
+              instanceId
+            );
             if (global.msranacosOnPolling.some(instance => instance.instanceId === instanceId)) {
                 logger.fine(
+                  getLogHeader() +
                     "msra nacos audit onPost: ConfigProcessor is on polling state, no need to fire an onPost.",
-                    instanceId
+                  instanceId
                 );
+                oThis.finishOperation(restOperation, auditTaskState);
             } else {
                 logger.fine(
+                  getLogHeader() +
                     "msra nacos audit onPost: ConfigProcessor is NOT on polling state, will trigger ConfigProcessor onPost.",
-                    instanceId
+                  instanceId
                 );
                 try {
                     var poolNameObject = getObjectByID(
@@ -137,21 +149,27 @@ msranacosEnforceConfiguredAuditProcessor.prototype.onPost = function (restOperat
                     poolNameObject.value = null;
                     oThis.finishOperation(restOperation, auditTaskState);
                     logger.fine(
+                      getLogHeader() +
                         "msra nacos audit onPost: trigger ConfigProcessor onPost ",
-                        instanceId
+                      instanceId
                     );
                 } catch (err) {
                     logger.fine(
+                      getLogHeader() +
                         "msra nacos audit onPost: Failed to send out restOperation. ",
-                        err.message
+                      err.message
                     );
                 }
             }
         } catch (ex) {
-            logger.fine("msranacosEnforceConfiguredAuditProcessor.prototype.onPost caught generic exception ", ex);
+            logger.fine(
+              getLogHeader() +
+                "msranacosEnforceConfiguredAuditProcessor.prototype.onPost caught generic exception ",
+              ex
+            );
             restOperation.fail(ex);
         }
-    }, 1000);
+    //}, 1000);
 };
 
 var getObjectByID = function ( key, array) {

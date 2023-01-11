@@ -123,7 +123,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
             "clusterName",
             "serviceName",
             "ipAddr",
-            "port",
+            "port"
         ]
         );
         dataProperties = blockUtil.getMapFromPropertiesAndValidate(
@@ -143,7 +143,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     var uri = this.restHelper.buildUri({
         protocol: this.wellKnownPorts.DEFAULT_HTTP_SCHEME,
         port: this.wellKnownPorts.DEFAULT_JAVA_SERVER_PORT,
-        hostname: "localhost",
+        hostname: "localhost"
     });
 
     //Accept input proterties, set the status to BOUND.
@@ -171,7 +171,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     const nacosAuthUrl = inputEndPoint + "/nacos/v1/auth/login";
     const nacosCrendential =
         "username=" + inputUserName + "&password=" + inputPassword;
-    var instanceUrl =
+    const instanceUrlConst =
         inputEndPoint +
         "/nacos/v1/ns/instance?" +
         "namespaceId=" +
@@ -187,11 +187,15 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         "&port=" +
         inputPort +
         "&ephemeral=false";
-    var listInstanceUrl =
-        inputEndPoint +
-        "/nacos/v1/ns/instance/list?" +
-        "serviceName=" +
-        inputServiceName;
+    var instanceUrl = instanceUrlConst;
+    const listInstanceUrlConst =
+      inputEndPoint +
+      "/nacos/v1/ns/instance/list?" +
+      "serviceName=" +
+      inputServiceName +
+      "&namespaceId=" +
+      inputNamespaceId;
+    var listInstanceUrl = listInstanceUrlConst;
 
     //Handle an instance, for action parameter, 'POST' for register and 'DELETE' for unregister
     function handleInstance(action, instance) {
@@ -268,7 +272,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         logger.fine(
             "MSRA: onPost, " +
             instanceName +
-            " already has an instance polling the same instancdId, change BLOCK to ERROR: ",
+            " already has an instance polling the same instanceId, change BLOCK to ERROR: ",
             instanceId
         );
         try {
@@ -413,9 +417,9 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                             );
                             // Authenticated user, go ahead for further process.
                             instanceUrl =
-                                instanceUrl + "&accessToken=" + jsondata.accessToken;
+                                instanceUrlConst + "&accessToken=" + jsondata.accessToken;
                             listInstanceUrl =
-                                listInstanceUrl + "&accessToken=" + jsondata.accessToken;
+                                listInstanceUrlConst + "&accessToken=" + jsondata.accessToken;
                             })
                             .catch(function (error) {
                             logger.fine(
