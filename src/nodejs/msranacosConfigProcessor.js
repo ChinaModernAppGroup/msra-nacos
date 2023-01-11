@@ -171,7 +171,7 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
     const nacosAuthUrl = inputEndPoint + "/nacos/v1/auth/login";
     const nacosCrendential =
         "username=" + inputUserName + "&password=" + inputPassword;
-    var instanceUrl =
+    const instanceUrlConst =
         inputEndPoint +
         "/nacos/v1/ns/instance?" +
         "namespaceId=" +
@@ -187,11 +187,15 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
         "&port=" +
         inputPort +
         "&ephemeral=false";
-    var listInstanceUrl =
-        inputEndPoint +
-        "/nacos/v1/ns/instance/list?" +
-        "serviceName=" +
-        inputServiceName;
+    var instanceUrl = instanceUrlConst;
+    const listInstanceUrlConst =
+      inputEndPoint +
+      "/nacos/v1/ns/instance/list?" +
+      "serviceName=" +
+      inputServiceName +
+      "&namespaceId=" +
+      inputNamespaceId;
+    var listInstanceUrl = listInstanceUrlConst;
 
     //Handle an instance, for action parameter, 'POST' for register and 'DELETE' for unregister
     function handleInstance(action, instance) {
@@ -413,9 +417,9 @@ msranacosConfigProcessor.prototype.onPost = function (restOperation) {
                             );
                             // Authenticated user, go ahead for further process.
                             instanceUrl =
-                                instanceUrl + "&accessToken=" + jsondata.accessToken;
+                                instanceUrlConst + "&accessToken=" + jsondata.accessToken;
                             listInstanceUrl =
-                                listInstanceUrl + "&accessToken=" + jsondata.accessToken;
+                                listInstanceUrlConst + "&accessToken=" + jsondata.accessToken;
                             })
                             .catch(function (error) {
                             logger.fine(
